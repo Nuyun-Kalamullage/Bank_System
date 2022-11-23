@@ -7,12 +7,17 @@ import java.util.Locale;
 
 public class Server extends Thread {
     private static HashMap<String,Client> authorisedClients = new HashMap<String,Client>();
+    private static HashMap<String,Client> authorisedClientAccounts = new HashMap<String,Client>();
     private Client connectedClient;
     private Socket s;
     int hashCode;
 
     public Server(Socket s) {//pass the values to class variables.
         this.s = s;
+    }
+
+    public static HashMap<String, Client> getAuthorisedClientAccounts() {
+        return authorisedClientAccounts;
     }
 
     public void run() {
@@ -32,8 +37,7 @@ public class Server extends Thread {
         out.println("");
         out.print(" Enter the Password : ");
         out.flush();
-        byte loopTime = 1;
-        int passLength = 0;
+        int loopTime = 1;
 
         EraserThread et = new EraserThread("Thread Stared",out);
         Thread mask = new Thread(et);
@@ -47,7 +51,7 @@ public class Server extends Thread {
 //            out.flush();
             if (authorisedClients.get(name).getPassword() == pass.hashCode()){
                 connectedClient = authorisedClients.get(name);
-                loopTime = 13;
+                loopTime = pass.hashCode();
                 return 1;
             }else{
                 loopTime++;
@@ -72,7 +76,6 @@ public class Server extends Thread {
 
             BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream())); // get inputs from user.
             PrintWriter out = new PrintWriter(new OutputStreamWriter(s.getOutputStream())); // print outputs to user.
-//            Console con = System.console();
             out.println("==================================================================");
             out.println("===============  Welcome to MID BANK - WEB Server ================");
             out.println("=================== AA 1711 - NuYuN Pabasara =====================");
@@ -86,11 +89,14 @@ public class Server extends Thread {
             String Lname;
             String nic;
             int password;
+            String userAccount;
             String amountStr;
             float deposit;
 
             String menuKey;
-            authorisedClients.put("nuyun99",new Client("Nuyun","Pabasara","991781757V","nuyun99","123".hashCode(),0));
+            Client c1 = new Client("Nuyun","Pabasara","991781757V","nuyun99","123".hashCode(),0);
+            authorisedClients.put("nuyun99",c1);
+            authorisedClientAccounts.put(c1.getAccountNumber(),c1);
 
             for (name = in.readLine(); !name.toLowerCase(Locale.ROOT).equals("quit"); name = in.readLine()) { //Get the unique Name ID from user
                 System.out.println(name);
@@ -156,8 +162,8 @@ public class Server extends Thread {
                         if (key.toLowerCase(Locale.ROOT).equals("y")) {
                             Client temporyClient = new Client(Fname, Lname, nic, name, password, deposit);
                             authorisedClients.put(name, temporyClient);
+                            authorisedClientAccounts.put(temporyClient.getAccountNumber(),temporyClient);
                             out.println("Account Creation Successful");
-                            //connectedClient = new Client("Nuyun","Pabasara","991781757V","nuyun99","123".hashCode(),0);
                             out.print("Please Enter Your User ID to login: ");
                             temporyClient.showClient();
                             out.flush();
@@ -200,123 +206,111 @@ public class Server extends Thread {
                 out.println("4.Money Transfer");
                 out.println("Enter the the number do you want to proceed :");
                 out.flush();
-                menuKey =in.readLine();
-                if (menuKey.toLowerCase(Locale.ROOT).equals("quit")){
-                    out.println("LogOut from Server");
-                    out.flush();
-                    s.close();
-                }else if(menuKey.toLowerCase(Locale.ROOT).equals("1")){
-                    out.println("Account No : "+connectedClient.getAccountNumber());
-                    out.println("Balance : "+connectedClient.getBalance());
-                }else if(menuKey.toLowerCase(Locale.ROOT).equals("2")){
+                synchronized (connectedClient) {
+                menuKey = in.readLine();
 
-                    //connectedClient.deposit(amount,pass)
+                    if (menuKey.toLowerCase(Locale.ROOT).equals("quit")) {
+                        out.println("LogOut from Server");
+                        out.flush();
+                        s.close();
+                    } else if (menuKey.toLowerCase(Locale.ROOT).equals("1")) {
+                        out.println("Account No : " + connectedClient.getAccountNumber());
+                        out.println("Balance : " + connectedClient.getBalance());
+                    } else if (menuKey.toLowerCase(Locale.ROOT).equals("2")) {
+                        amountStr = null;
+                        out.print("Enter amount for deposit : ");
+                        out.flush();
+                        amountStr = in.readLine();
+                        while (!amountStr.matches("[-+]?[0-9]*\\.?[0-9]+")) {
+                            out.print("Please Enter valid amount for deposit : ");
+                            out.flush();
+                            amountStr = in.readLine();
+                        }
+                        Float amount = Float.parseFloat(amountStr);
+                        if (verifyPassword(connectedClient.getUsername(), s, in, out) == 1) {
+                            connectedClient.deposit(amount);
+                            out.println("Deposit Successful:)");
+                            out.println("Updated balance : Rs:" + connectedClient.getBalance() + "/=");
+                        } else {
+                            out.println("Password limit reached. Please Try again:(");
+                        }
+                        out.flush();
 
-                }else if(menuKey.toLowerCase(Locale.ROOT).equals("3")){
 
-                }else if(menuKey.toLowerCase(Locale.ROOT).equals("4")){
+                    } else if (menuKey.toLowerCase(Locale.ROOT).equals("3")) {
 
+                        amountStr = null;
+                        int response = 0;
+                        out.print("Enter amount for Withdraw : ");
+                        out.flush();
+                        amountStr = in.readLine();
+                        while (!amountStr.matches("[-+]?[0-9]*\\.?[0-9]+")) {
+                            out.println("Current Balance : Rs:" + connectedClient.getBalance() + "/=");
+                            out.print("Please Enter valid amount for Withdraw : ");
+                            out.flush();
+                            amountStr = in.readLine();
+                        }
+                        Float amount = Float.parseFloat(amountStr);
+                        if (verifyPassword(connectedClient.getUsername(), s, in, out) == 1) {
+                            response = connectedClient.withdraw(amount);
+                            if (response == 1) {
+                                out.println("Withdraw Successful:)");
+                                out.println("Updated balance : Rs:" + connectedClient.getBalance()+"/=");
+                            } else {
+                                out.println("Insufficient money:(");
+                            }
+                        } else {
+                            out.println("Password limit reached. Please Try again:(");
+                            //out.print("Please Enter Your User ID : ");//print Name ID is not unique.}
+                        }
+                        out.flush();
+
+                    } else if (menuKey.toLowerCase(Locale.ROOT).equals("4")) {
+
+                        amountStr = null;
+                        int response = 0;
+                        out.print("Enter amount for Withdraw : ");
+                        out.flush();
+                        amountStr = in.readLine();
+                        while (!amountStr.matches("[-+]?[0-9]*\\.?[0-9]+")) {
+                            out.println("Current Balance : Rs:" + connectedClient.getBalance() + "/=");
+                            out.print("Please Enter valid amount for Transfer : ");
+                            out.flush();
+                            amountStr = in.readLine();
+                        }
+                        Float amount = Float.parseFloat(amountStr);
+
+                        out.print("Enter the user Account : ");
+                        out.flush();
+                        userAccount = in.readLine();
+                        while (!Client.getAccountNumberList().contains(userAccount) || userAccount.isEmpty()) {
+                            if (userAccount.toLowerCase(Locale.ROOT).equals("quit")) {
+                                out.println("LogOut from Server");
+                                out.flush();
+                                s.close();
+                            }
+                            out.print("Enter Valid User Account : ");
+                            out.flush();
+                            userAccount = in.readLine();
+                        }
+
+                        if (verifyPassword(connectedClient.getUsername(), s, in, out) == 1) {
+                            response = connectedClient.transfer(amount, userAccount);
+                            if (response == 1) {
+                                out.println("Transfer Successful:)");
+                                out.println("Updated balance : Rs:" + connectedClient.getBalance()+"/=");
+                            } else {
+                                out.println("Insufficient money:(");
+                            }
+                        } else {
+                            out.println("Password limit reached. Please Try again:(");
+                            //out.print("Please Enter Your User ID : ");//print Name ID is not unique.}
+                        }
+                        out.flush();
+                    }
                 }
             }
 
-//
-//            Item.nameSet.add(name);
-//            while (s.isConnected()) {
-//                if (Main.a.matches("Remaining BID-Time for not extended items 0:0:0")) {
-//                    out.println("\nRemaining BID-Time for not extended items is Over"); // display the remaining time for not extended items.
-//                } else {
-//                    out.println("\n" + Main.a + "\r");
-//                }
-//                out.print("\nOK " + name + ", Please Enter the symbol of the item that you want to bid : ");
-//                out.flush();
-//
-//                String symbol;
-//                for (symbol = in.readLine().toUpperCase();  ; symbol = in.readLine().toUpperCase()) { // get symbol from user.
-//                    if (symbol.equalsIgnoreCase("quit"))
-//                        s.close();
-//                    else if(!item_map.containsKey(symbol)) {
-//                        out.println("-1 , Symbol is invalid.Try again");// Display when symbol is invalid.
-//                        out.flush();
-//                    }else {
-//                        out.println("\nYes " + name + ", The CURRENT PRICE of the " + symbol + " item is : " + item_map.get(symbol).get_price()+"\n");
-//                        out.println(name + ", Do you want to Bid on this item ? (Type with \"yes\" or \"no\")");
-//                        out.flush();
-//                        String exist;
-//                        for (exist = in.readLine(); !exist.equalsIgnoreCase("no") && !exist.equalsIgnoreCase("yes") ; exist = in.readLine()) {
-//                            if(exist.equalsIgnoreCase("quit")) {
-//                                s.close();
-//                            }
-//                            out.println("Enter valid Input!!");// if enter another value display invalid input.
-//                            out.flush();
-//                        }
-//                        if(exist.equalsIgnoreCase("yes")){ // break the loop and go for bidding.
-//                            break;
-//                        }
-//                        out.print("\nOK " + name + ", Please Enter the symbol of the item that you want to bid : ");
-//                        out.flush();
-//                    }
-//
-//
-//                }
-//
-//                Item item = item_map.get(symbol);
-//                out.println("\nPlease Wait.......");
-//                out.flush();
-//                synchronized (item) { //wait others when accessing same item.
-//
-//                    out.print("\nPlease enter your price to bid : ");
-//                    out.flush();
-//                    String price = "0";
-//                    int excessBytesDuringWait = s.getInputStream().available();
-//                    if (excessBytesDuringWait > 0) {
-//                        s.getInputStream().skip(excessBytesDuringWait);
-//                        System.out.println(excessBytesDuringWait);
-//                    }
-//                    try {
-//                        for (price = in.readLine(); !price.equals("quit") && Float.parseFloat(price) <= item.get_price(); price = in.readLine()) {//Check the entered price is higher than current price.
-//
-//                            out.print("\nError: Hi " + name + ", The price you entered must be more than the current price of the item. Note that the current price of " + symbol + " is " + item.get_price());
-//                            out.print("\nPlease re-enter your price to bid : ");
-//                            out.flush();
-//                        }
-//                        if (price.equals("quit"))
-//                            s.close();
-//                    } catch (NumberFormatException e) {//if there is a number format exception.
-//                        out.println("\nError You entered an invalid value for price. Exiting the Auction server ....Try again");
-//                        out.flush();
-//                        s.close();
-//                    }
-//
-//                    out.println("\nOk " + name + ",Your price accepted. Please enter 'confirm' and press enter to confirm bidding.");
-//                    out.println("Or enter 'quit' and press enter to quit bidding.");
-//                    out.flush();
-//
-//                    for (String confirm = in.readLine(); !confirm.equals("confirm"); confirm = in.readLine()) { //get confirmation about bidding from user.
-//                        if (confirm.equals("quit"))
-//                            s.close();
-//                        out.println("Error input: Hi " + name + ", Enter 'confirm' and press enter to confirm bidding.");
-//                        out.println("Or enter 'quit' and press enter to quit bidding.");
-//                        out.flush();
-//                    }
-//
-//                    if (!item_map.get(symbol).timeOut) {
-//                        item_map.get(symbol).set_Name(name);
-//                        if (item_map.get(symbol).make_bid(Float.parseFloat(price)) == 0) {//Display corresponding output according to error code.
-//                            out.println("\nCongratulations " + name + ", Your bid saved successfully.");
-//                            out.println("Current Price in " + symbol + " is " + price + ".");
-//                            item_map.get(symbol).make_bid(Float.parseFloat(price));// do the bidding function.
-//                            sleep(500);// sleep the thread 0.5 seconds. Then no more users can't made bid within 500ms.
-//                        } else {
-//                            out.println(name + ",Your bid is expired. Due to TimeOut ");// Display bid is expired.
-//                        }
-//                    } else {
-//                        out.println(name + ",Your bid is expired. Due to TimeOut");// Display bid is expired.
-//                    }
-//                    out.println("\nThank You for using Stock Exchange Server."); // exit the server.
-//                    out.println("==================================================================");
-//                    out.flush();
-//                }
-//
         } catch (IOException iOException) {
             this.s.close(); //if try block fails close the connection.
         } catch (InterruptedException e) {

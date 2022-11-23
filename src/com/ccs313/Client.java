@@ -103,33 +103,24 @@ public class Client {
 
     }
 
-    public int deposit(float amount, int password){
-        if(Password == password){ // success
+    public void deposit(float amount){
             balance+=amount;
-            return 1;
-        }else{ // invalid password
-            return -1;
-        }
     }
 
-    public int transfer(float amount, String accountNumber, int password){
-        if(Password == password && accountNumberList.contains(accountNumber) && amount <= balance){ //success
+    public int transfer(float amount, String accountNumber){
+        if(amount <= balance){ //success
             balance-=amount;
+            float transferUserBalance = Server.getAuthorisedClientAccounts().get(accountNumber).getBalance();
+            Server.getAuthorisedClientAccounts().get(accountNumber).setBalance(transferUserBalance + amount);
             return 1;
-        }else if(Password != password){//invalid password
-            return -1;
-        }else if(!accountNumberList.contains(accountNumber)){//invalid account
-            return -2;
         }else{ //insufficient balance
             return 0;
         }
     }
-    public int withdraw(float amount, int password){
-        if(Password == password && amount <= balance){ //success
+    public int withdraw(float amount){
+        if(amount <= balance){ //success
             balance-=amount;
             return 1;
-        }else if(Password != password){//invalid password
-            return -1;
         }else{ //insufficient balance
             return 0;
         }
